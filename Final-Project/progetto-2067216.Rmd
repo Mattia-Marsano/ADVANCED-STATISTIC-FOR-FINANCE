@@ -1,0 +1,262 @@
+---
+title: "ADVANCED STATISTICS FOR FINANCE EXAM - DATASET: MOVIES"
+
+author: "MATTIA MARSANO"
+
+date: "18 JUNE 2026"
+
+output:
+  html_document: default
+  
+---
+
+This project analyzes the movies.csv dataset, which contains information about movies such as "budget", "gross revenue", "runtime", "score", "votes" and "year" of release. The main objective is to study the relationship between movie revenue and the available numerical variables using multiple linear regression. The analysis also includes missing data cleaning, model selection through forward and backward stepwise selection, and an evaluation of the final model on a test set.
+
+# 1) LOADING THE DATA INTO R                                                  
+
+```{r}
+
+movies <- read.csv("movies.csv")
+
+dim(movies)  
+View(movies)
+names(movies) 
+summary(movies) 
+
+```
+
+# 2) MISSING DATA
+First I count the missing values and then remove the observations that have at least one of them. 
+                                                                            
+```{r}
+initial.n.rows <- dim(movies)[1] 
+initial.n.rows
+
+sum(is.na(movies))   
+
+movies.without.na <- na.omit(movies)
+dim(movies.without.na)
+sum(is.na(movies.without.na)) 
+```
+
+Since in the description of the file it is written that "budget" equal to 0 means missing, I put these values equal to "NA" and then remove them (even though in this specific case there are no observations in "budget" that are 0 but I decided to do it anyway to show the procedure with the codes).
+
+```{r}
+sum(movies.without.na$budget == 0)
+movies.without.na$budget[movies.without.na$budget == 0] <- NA
+sum(is.na(movies.without.na))
+
+movies.cleaned <- na.omit(movies.without.na)
+dim(movies.cleaned)
+sum(is.na(movies.cleaned))
+
+final.n.rows <- dim(movies.cleaned)[1]
+final.n.rows
+
+```
+
+Finally, the percentage of observations removed is:
+
+```{r}
+missing.percentage <- 100 * (initial.n.rows - final.n.rows) / initial.n.rows
+missing.percentage
+```
+
+# 3) SCATTERPLOT 
+
+I consider the variables "score" and "budget" (expressed in millions).
+
+```{r}
+plot(movies.cleaned$budget/1000000, movies.cleaned$score,
+     xlab = "Budget",
+     ylab = "Score",
+     main = "Relationship between score and budget",
+     pch = 20,
+     col = "blue",
+     xaxt = "n")
+axis(1, at = seq(0, 350, by = 25))
+```
+
+The scatterplot shows that there is not a strong linear relationship between "budget" and "score".Most movies are concentrated in the left part of the graph, meaning that many films have relatively low budgets compared to the few movies with very high budgets. The points are quite dispersed, so there is not a strong linear relationship between budget and score. In general, movies with higher budgets do not necessarily obtain higher scores. 
+
+
+# 4) MULTIPLE LINEAR REGRESSION 
+
+I fit a multiple linear regression model with "gross" as response variable and the other numerical variables as predictors. As we can see this variables doesn't explanlain all the variability on "gross" and there is a specific reason that will be analyzed in the end.
+
+```{r}
+lm.full <- lm(gross ~ budget + runtime + score + votes + year,
+              data = movies.cleaned)
+summary(lm.full) 
+plot(lm.full)  #reminder: heteroschedasticity
+```
+
+
+
+```{r}
+plot(fitted(lm.full), movies.cleaned$gross,
+     xlab = "Fitted values",
+     ylab = "Observed gross",
+     main = "Observed vs fitted values",
+     pch = 20,
+     col = "blue")
+
+abline(0, 1, col = "red")
+```
+
+
+
+
+# 5) FORWARD STEPWISE SELECTION
+
+I use Forward Stepwise Selection with the function "regsubsets()".
+
+```{r}
+library(leaps)
+regfit.forward <- regsubsets(gross ~ budget + runtime + score + votes + year, 
+                         data = movies.cleaned,                            
+                         nvmax = 5,
+                         method = "forward")
+
+summary(regfit.forward)
+reg.summary.forward <- summary(regfit.forward)
+names(reg.summary.forward)
+```
+
+To check manually and understand better (and practically) how the Forward Stepwise Selection works.
+We can see that the best 2-regressor model (which minimize the RSS)is the third using "votes" after "budget".
+This is the mechanism that explain the * in the results of the previous chunk and it is repeated also with the other variables.
+
+```{r}
+lm1 <- lm(gross ~ budget + runtime, data = movies.cleaned)
+lm2 <- lm(gross ~ budget + score, data = movies.cleaned)
+lm3 <- lm(gross ~ budget + votes, data = movies.cleaned)
+lm4 <- lm(gross ~ budget + year, data = movies.cleaned)
+
+sum(resid(lm1)^2)
+sum(resid(lm2)^2)
+sum(resid(lm3)^2)
+sum(resid(lm4)^2)
+```
+
+I look at adjusted R squared, Cp and BIC.
+
+```{r}
+summary(regfit.forward)$cp
+which.min(reg.summary.forward$cp)
+```
+
+```{r}
+summary(regfit.forward)$bic
+which.min(reg.summary.forward$bic)
+```
+
+```{r}
+summary(regfit.forward)$adjr2
+which.max(reg.summary.forward$adjr2)
+```
+
+The model selected by BIC is:
+```{r}
+best.forward <- which.min(reg.summary.forward$bic)
+best.forward
+coef(regfit.forward, best.forward)
+```
+
+
+# 6) BACKWARD STEPWISE SELECTION         
+
+Now I repeat the same thing with Backward Stepwise Selection.
+
+```{r}
+regfit.backward <- regsubsets(gross ~ budget + runtime + score + votes + year,
+                         data = movies.cleaned,
+                         nvmax = 5,
+                         method = "backward")
+summary(regfit.backward)
+reg.summary.backward <- summary(regfit.backward)
+```
+
+Again, I look at adjusted R squared, Cp and BIC.
+
+```{r}
+summary(regfit.backward)$cp
+which.min(reg.summary.backward$cp)
+```
+
+```{r}
+summary(regfit.backward)$bic
+which.min(reg.summary.backward$bic)
+```
+
+```{r}
+summary(regfit.backward)$adjr2
+which.max(reg.summary.backward$adjr2)
+```
+
+The model selected by BIC is:
+
+```{r}
+best.backward <- which.min(reg.summary.backward$bic)
+best.backward
+coef(regfit.backward, best.backward)
+```
+
+
+# 7) COMPARISON
+
+I compare the coefficients and the BIC values of the two selected models.
+
+```{r}
+
+coef(regfit.forward, best.forward)
+coef(regfit.backward, best.backward)
+
+reg.summary.forward$bic[best.forward]
+reg.summary.backward$bic[best.backward]
+```
+
+The forward and backward stepwise selection procedures select the same final model including "budget", "runtime", "score" and "votes" and excluding "year". Since the selected predictors are the same, the estimated coefficients and the BIC values are identical. This suggests that the selected model is stable with respect to the selection method.
+
+Running a regression without the variable "year"
+
+```{r}
+lm.final.all <- lm(gross ~ budget + runtime + score + votes, data = movies.cleaned)
+summary(lm.final.all)
+```
+
+In the full multiple linear regression model (the initial one: lm.full), the variable "year" has a p-value of about 0.343. Since this value is much larger than the usual significance level of 0.05, "year" is not statistically significant after controlling for "budget", "runtime", "score" and "votes". This means that, once the other numerical predictors are included in the model, "year" does not seem to have a relevant individual effect on "gross". This result is also confirmed by the comparison between the full model and the reduced model without "year". Therefore, is it preferred the model without "year" (the final one: lm.final.all), since it gives almost the same explanatory power but with fewer variables.
+
+
+# 8) TRANING SET, TEST SET AND MSE
+
+I split the data into a training set and a test set. The training set contains about 70 percent of the observations.
+
+```{r}
+set.seed(1234)
+train <- sample(1:nrow(movies.cleaned), 0.7 * nrow(movies.cleaned))
+test <- (-train)
+
+movies.train <- movies.cleaned[train, ]
+movies.test <- movies.cleaned[test, ]
+
+dim(movies.train)
+dim(movies.test)
+```
+
+I fit the final model on the training set.
+
+```{r}
+lm.train <- lm(gross ~ budget + runtime + score + votes, data = movies.train)
+summary(lm.train)
+```
+
+Then I predict "gross" on the test set and compute the mean squared error.
+
+```{r}
+pred.final <- predict(lm.train, movies.test)
+mse.final <- mean((movies.test$gross - pred.final)^2)
+mse.final
+```
+
+The value "mse.final" is the test mean squared error of my final model. The RMSE is about 100 million, meaning that the typical prediction error on the test set is around 100 million in gross revenue. This is quite large, but it is reasonable given the high variability of movie revenues and the presence of outliers. Therefore, the model has some predictive ability, but its predictions are still affected by substantial uncertainty.
