@@ -10,11 +10,10 @@
 
 ## About This Repository
 
-This repository contains selected laboratory exercises and the final examination project completed as part of the Advanced Statistics for Finance course at Sapienza University of Rome.
-
-The materials document the practical application of statistical learning methods using R and R Markdown.
+This repository contains selected laboratory exercises and the final examination project completed as part of the Advanced Statistics for Finance course at Sapienza University of Rome. The materials document the practical application of statistical learning methods using R and R Markdown.
 
 ## Final Examination Project – Movie Revenue Analysis
+[View Full Project Report (HTML)](https://mattia-marsano.github.io/ADVANCED-STATISTIC-FOR-FINANCE/Final-Project/progetto-2067216.html)
 
 The final project investigates the relationship between movie gross revenue and several numerical variables, including production budget, runtime, ratings, number of votes, and release year.
 
